@@ -345,7 +345,14 @@
                 :label="$t('server.name')"
                 sortable
               >
-                {{ props.row.name }}
+                <span
+                  v-if="formatCountryCode(props.row.countryCode)"
+                  class="country-badge"
+                  :title="formatCountryCode(props.row.countryCode)"
+                >
+                  {{ formatCountryCode(props.row.countryCode) }}
+                </span>
+                <span class="node-name-text">{{ props.row.name }}</span>
               </b-table-column>
               <b-table-column
                 v-slot="props"
@@ -498,7 +505,14 @@
                 :label="$t('server.name')"
                 sortable
               >
-                {{ props.row.name }}
+                <span
+                  v-if="formatCountryCode(props.row.countryCode)"
+                  class="country-badge"
+                  :title="formatCountryCode(props.row.countryCode)"
+                >
+                  {{ formatCountryCode(props.row.countryCode) }}
+                </span>
+                <span class="node-name-text">{{ props.row.name }}</span>
               </b-table-column>
               <b-table-column
                 v-slot="props"
@@ -965,6 +979,16 @@ export default {
         return info.address;
       }
       return this.$t("server.name");
+    },
+    formatCountryCode(countryCode) {
+      if (!countryCode || typeof countryCode !== "string") {
+        return "";
+      }
+      const code = countryCode.trim().toUpperCase();
+      if (!/^[A-Z]{2}$/.test(code)) {
+        return "";
+      }
+      return code;
     },
     formatOutboundLabel(which = {}) {
       if (!which.outbound) {
@@ -2254,6 +2278,27 @@ tr.highlight-row-disconnected {
 }
 .latency-valid {
   color: green;
+}
+.country-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 1.25rem;
+  margin-right: 0.45rem;
+  padding: 0 0.35rem;
+  border: 1px solid #d7d7d7;
+  border-radius: 3px;
+  background: #f7f7f7;
+  color: #31415f;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.node-name-text {
+  vertical-align: middle;
 }
 
 @media screen and (max-width: 1920px) {

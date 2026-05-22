@@ -1512,7 +1512,7 @@ func (t *Template) resolveOutbounds(
 	setting := configure.GetSettingNotNil()
 	for obj, sInfos := range serverData.ServerObj2ServerInfos() {
 		var (
-			usedByBalancer bool
+			usedByGroup bool
 		)
 		// an vmessInfo(server template) may be used by multiple serverInfos(a connected server)
 
@@ -1523,10 +1523,10 @@ func (t *Template) resolveOutbounds(
 		}
 		var balancers []balancer
 		for _, sInfo := range sInfos {
-			if len(serverData.OutboundName2ServerObjs[sInfo.OutboundName]) > 1 {
-				// balancer
-				if !usedByBalancer {
-					usedByBalancer = true
+			if len(serverData.OutboundName2ServerObjs[sInfo.OutboundName]) >= 1 {
+				// group outbound, including single-member groups so observatory can monitor them.
+				if !usedByGroup {
+					usedByGroup = true
 				}
 				balancers = append(balancers, balancer{
 					name:       sInfo.OutboundName,
@@ -1557,7 +1557,7 @@ func (t *Template) resolveOutbounds(
 				supportUDP[sInfo.OutboundName] = c.UDPSupport
 			}
 		}
-		if usedByBalancer {
+		if usedByGroup {
 			// the v2ray outbound is shared by balancers
 			outboundTag := GroupWrapper(obj.GetName())
 			c, err := obj.Configuration(serverObj.PriorInfo{

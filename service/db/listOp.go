@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	jsoniter "github.com/json-iterator/go"
@@ -41,9 +42,18 @@ func ListSet(bucket string, key string, index int, val interface{}) (err error) 
 		status := parsed.Get("status").String()
 		info := parsed.Get("info").String()
 
+		var subID int64
+		err = db.QueryRow("SELECT id FROM subscriptions WHERE sort = ?", index).Scan(&subID)
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("ListSet: subscription at index %d not found", index)
+		}
+		if err != nil {
+			return err
+		}
+
 		result, err := db.Exec(
-			"UPDATE subscriptions SET address = ?, status = ?, info = ?, updated_at = CURRENT_TIMESTAMP WHERE sort = ?",
-			address, status, info, index,
+			"UPDATE subscriptions SET address = ?, status = ?, info = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+			address, status, info, subID,
 		)
 		if err != nil {
 			return err
@@ -54,7 +64,6 @@ func ListSet(bucket string, key string, index int, val interface{}) (err error) 
 		}
 
 		// Update servers within this subscription
-		subID := int64(index + 1)
 		db.Exec("DELETE FROM servers WHERE type = 'subscription_server' AND sub_id = ?", subID)
 
 		servers := parsed.Get("servers").Array()
@@ -93,10 +102,11 @@ func ListGet(bucket string, key string, index int) (b []byte, err error) {
 		return []byte(configJSON), nil
 
 	case "touch/subscriptions":
+		var subID int64
 		var address, status, info string
 		err = db.QueryRow(
-			"SELECT address, status, info FROM subscriptions WHERE sort = ?", index,
-		).Scan(&address, &status, &info)
+			"SELECT id, address, status, info FROM subscriptions WHERE sort = ?", index,
+		).Scan(&subID, &address, &status, &info)
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("ListGet: can't get element from an empty list")
 		}
@@ -107,20 +117,20 @@ func ListGet(bucket string, key string, index int) (b []byte, err error) {
 		// Reconstruct the subscription JSON with servers
 		rows, err := db.Query(
 			"SELECT config_json FROM servers WHERE type = 'subscription_server' AND sub_id = ? ORDER BY sort",
-			int64(index+1),
+			subID,
 		)
 		if err != nil {
 			return nil, err
 		}
 		defer rows.Close()
 
-		var servers []gjson.Result
+		var servers []json.RawMessage
 		for rows.Next() {
 			var s string
 			if err := rows.Scan(&s); err != nil {
 				return nil, err
 			}
-			servers = append(servers, gjson.Parse(s))
+			servers = append(servers, json.RawMessage(s))
 		}
 
 		serversJSON, _ := jsoniter.Marshal(servers)
@@ -265,14 +275,14 @@ func ListGetAll(bucket string, key string) (list [][]byte, err error) {
 				return nil, err
 			}
 
-			var servers []gjson.Result
+			var servers []json.RawMessage
 			for serverRows.Next() {
 				var s string
 				if err := serverRows.Scan(&s); err != nil {
 					serverRows.Close()
 					return nil, err
 				}
-				servers = append(servers, gjson.Parse(s))
+				servers = append(servers, json.RawMessage(s))
 			}
 			serverRows.Close()
 

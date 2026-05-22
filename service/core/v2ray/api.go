@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/devfeel/mapper"
@@ -38,6 +39,39 @@ type OutboundStatus struct {
 	Which        *configure.Which `json:"which"`
 	LastSeenTime int64            `json:"last_seen_time"`
 	LastTryTime  int64            `json:"last_try_time"`
+}
+
+var statusSnapshot = struct {
+	sync.RWMutex
+	items map[string][]OutboundStatus
+}{
+	items: make(map[string][]OutboundStatus),
+}
+
+func SetOutboundStatusSnapshot(outboundName string, statuses []OutboundStatus) {
+	copied := make([]OutboundStatus, len(statuses))
+	copy(copied, statuses)
+	statusSnapshot.Lock()
+	statusSnapshot.items[outboundName] = copied
+	statusSnapshot.Unlock()
+}
+
+func ResetOutboundStatusSnapshot() {
+	statusSnapshot.Lock()
+	statusSnapshot.items = make(map[string][]OutboundStatus)
+	statusSnapshot.Unlock()
+}
+
+func GetOutboundStatusSnapshot() map[string][]OutboundStatus {
+	statusSnapshot.RLock()
+	defer statusSnapshot.RUnlock()
+	copied := make(map[string][]OutboundStatus, len(statusSnapshot.items))
+	for outbound, statuses := range statusSnapshot.items {
+		copiedStatuses := make([]OutboundStatus, len(statuses))
+		copy(copiedStatuses, statuses)
+		copied[outbound] = copiedStatuses
+	}
+	return copied
 }
 
 func init() {
@@ -136,6 +170,7 @@ func ObservatoryProducer(apiPort int, observatoryTags []string) (closeFunc func(
 							w = append(w, *v)
 						}
 					}
+					SetOutboundStatusSnapshot(r.OutboundName, os)
 					msg := gin.H{
 						"outboundName":   r.OutboundName,
 						"outboundStatus": os,

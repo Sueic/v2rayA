@@ -391,6 +391,7 @@ func checkUpdate() {
 			f()
 		}
 	}()
+	service.StartSelectedNodeHealthCheck()
 }
 
 func run() (err error) {

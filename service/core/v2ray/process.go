@@ -41,6 +41,7 @@ func NewProcess(tmpl *Template,
 	prestart func() error, poststart func() error,
 	postUnexpectedStop func(p *Process),
 ) (*Process, error) {
+	ResetOutboundStatusSnapshot()
 	process := &Process{
 		template: tmpl,
 		done:     make(chan struct{}),
